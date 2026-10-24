@@ -3,7 +3,7 @@
 <title>Monitoring Gudang Pusat</title>
 <style>
 #appShell{display:none}
-#authGate{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:var(--bg)}
+#authGate{display:none;position:fixed;inset:0;z-index:1000;min-height:100vh;align-items:center;justify-content:center;padding:20px;background:#f3f6fbef}
 .auth-card{width:min(430px,100%);background:#fff;border:1px solid var(--line);border-radius:16px;padding:24px;box-shadow:0 12px 35px #0f172a12}
 .auth-card h1{font-size:23px;margin:0 0 6px;color:var(--navy)}
 .auth-card .field{margin:14px 0}
@@ -26,13 +26,13 @@
 <button class="primary" id="loginButton" type="submit" style="width:100%">Masuk</button>
 </form>
 <div id="loginMessage" class="auth-error"></div>
-<div class="footer">Akses data dilindungi login dan kebijakan database.</div>
+<div class="footer">Halaman ini bisa dilihat tanpa login. Login hanya diperlukan untuk Admin.</div><button class="soft" type="button" onclick="closeAdminLogin()" style="width:100%;margin-top:10px">Kembali ke halaman lihat</button>
 </div></div>
 <div id="appShell"><div class="layout"><aside class="side"><div class="brand">GUDANG PUSAT</div><div class="sub">Monitoring Stok & Kapasitas</div>
 <nav class="nav">
 <button class="active" data-page="dashboard">▦ &nbsp; Dashboard</button><button data-page="transaksi">⇄ &nbsp; Transaksi</button><button data-page="persediaan">▤ &nbsp; Persediaan</button><button data-page="lokasi">▥ &nbsp; Lokasi & Kapasitas</button><button data-page="pengadaan">♧ &nbsp; Stok Menipis</button><button data-page="data">⇧ &nbsp; Import / Export</button>
 </nav></aside>
-<main class="main"><header class="top"><div><div class="eyebrow">Sistem monitoring persediaan</div><h1 id="pageTitle">Dashboard Gudang</h1><div class="muted" id="today"></div></div><div class="actions"><span id="roleBadge" class="pill">—</span><button class="soft" onclick="exportCSV()">Ekspor Excel</button><button class="primary admin-only" onclick="go('transaksi')">+ Transaksi</button><button class="soft" id="logoutButton">Keluar</button></div></header>
+<main class="main"><header class="top"><div><div class="eyebrow">Sistem monitoring persediaan</div><h1 id="pageTitle">Dashboard Gudang</h1><div class="muted" id="today"></div></div><div class="actions"><span id="roleBadge" class="pill">LIHAT SAJA</span><button class="soft" onclick="exportCSV()">Ekspor Excel</button><button class="primary admin-only" onclick="go('transaksi')">+ Transaksi</button><button class="primary" id="adminLoginToggle" onclick="openAdminLogin()">Login Admin</button><button class="soft" id="logoutButton" style="display:none">Keluar</button></div></header>
 <div id="viewerNotice" class="viewer-lock readonly-hide">Mode lihat saja — akun ini tidak dapat mengubah stok atau transaksi.</div>
 <section class="section active" id="dashboard">
 <div class="notice"><b>Data awal dimuat dari master.xlsx.</b> Nilai stok kosong tetap ditandai “Perlu verifikasi”; stok negatif tidak otomatis diubah. Isi kapasitas gudang dan batas minimum sesuai data resmi.</div>
@@ -95,6 +95,8 @@ function save(){
 function applyRoleUI(){
   const admin=currentRole==='admin';
   document.getElementById('roleBadge').textContent=admin?'ADMIN':'LIHAT SAJA';
+  document.getElementById('adminLoginToggle').style.display=admin?'none':'inline-block';
+  document.getElementById('logoutButton').style.display=admin?'inline-block':'none';
   document.getElementById('viewerNotice').classList.toggle('readonly-hide',admin);
   document.querySelectorAll('.admin-only').forEach(el=>el.classList.toggle('readonly-hide',!admin));
   document.querySelectorAll('.viewer-export').forEach(el=>el.classList.toggle('readonly-hide',admin));
@@ -111,6 +113,13 @@ function applyRoleUI(){
   } else {
     ['capacityInput','capacityMethod','locationName'].forEach(id=>{const el=document.getElementById(id);if(el)el.disabled=false;});
   }
+}
+function openAdminLogin(){document.getElementById('authGate').style.display='flex';document.getElementById('loginMessage').textContent='';}
+function closeAdminLogin(){document.getElementById('authGate').style.display='none';document.getElementById('loginPassword').value='';}
+async function startPublicView(){
+  currentUser=null;currentRole='viewer';sharedReady=false;
+  try{await loadSharedState();sharedReady=true;document.getElementById('appShell').style.display='block';applyRoleUI();renderAll();}
+  catch(err){document.getElementById('appShell').style.display='block';document.getElementById('viewerNotice').classList.remove('readonly-hide');document.getElementById('viewerNotice').textContent='Data belum bisa dimuat. Admin perlu memastikan data sudah tersimpan dan akses baca publik pada Supabase sudah diaktifkan. Detail: '+err.message;}
 }
 async function startSession(user){
   currentUser=user;
@@ -142,10 +151,10 @@ document.getElementById('loginForm').addEventListener('submit',async e=>{
 document.getElementById('logoutButton').addEventListener('click',async()=>{
   sharedReady=false;currentUser=null;currentRole='viewer';
   await supabaseClient.auth.signOut();
-  document.getElementById('appShell').style.display='none';
-  document.getElementById('authGate').style.display='flex';
+  document.getElementById('authGate').style.display='none';
   document.getElementById('loginPassword').value='';
-  document.getElementById('loginMessage').textContent='Anda telah keluar.';
+  document.getElementById('loginMessage').textContent='Anda telah keluar dari akun Admin.';
+  await startPublicView();
 });
  
 const fmt=n=>n===null||n===undefined||n===''?'—':Number(n).toLocaleString('id-ID',{maximumFractionDigits:0});
@@ -192,7 +201,7 @@ document.getElementById('importJSON').addEventListener('change',e=>{if(currentRo
   const {data,error}=await supabaseClient.auth.getSession();
   if(error){document.getElementById('loginMessage').textContent=error.message;return;}
   if(data.session){
-    try{await startSession(data.session.user);}catch(err){document.getElementById('loginMessage').textContent=err.message;await supabaseClient.auth.signOut();}
-  }
+    try{await startSession(data.session.user);}catch(err){document.getElementById('loginMessage').textContent=err.message;await supabaseClient.auth.signOut();await startPublicView();}
+  } else { await startPublicView(); }
 })();
 </script></body></html>
