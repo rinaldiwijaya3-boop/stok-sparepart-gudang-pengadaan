@@ -1,6 +1,6 @@
 -- Stok Sparepart Gudang Pengadaan — Supabase setup
 -- Run this in Supabase Dashboard > SQL Editor.
--- Security model: authenticated users can read app_state; only profiles with role='admin' can write.
+-- Security model: anyone can read shared app_state without login; only authenticated admins can write.
 create extension if not exists pgcrypto;
 
 create table if not exists public.profiles (
@@ -66,9 +66,10 @@ using (public.is_admin())
 with check (public.is_admin());
 
 drop policy if exists "Authenticated users can read shared app state" on public.app_state;
-create policy "Authenticated users can read shared app state"
+drop policy if exists "Anyone can read shared app state" on public.app_state;
+create policy "Anyone can read shared app state"
 on public.app_state for select
-to authenticated
+to anon, authenticated
 using (true);
 
 drop policy if exists "Admins can insert shared app state" on public.app_state;
@@ -86,6 +87,7 @@ with check (public.is_admin());
 
 revoke all on public.profiles from anon;
 revoke all on public.app_state from anon;
+grant select on public.app_state to anon;
 grant usage on schema public to authenticated;
 grant select, update on public.profiles to authenticated;
 grant select, insert, update on public.app_state to authenticated;
