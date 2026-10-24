@@ -98,10 +98,18 @@ function applyRoleUI(){
   document.getElementById('viewerNotice').classList.toggle('readonly-hide',admin);
   document.querySelectorAll('.admin-only').forEach(el=>el.classList.toggle('readonly-hide',!admin));
   document.querySelectorAll('.viewer-export').forEach(el=>el.classList.toggle('readonly-hide',admin));
-  document.querySelectorAll('.nav button').forEach(el=>{if(el.dataset.page==='transaksi'||el.dataset.page==='data')el.classList.toggle('readonly-hide',false);});
+  document.querySelectorAll('.nav button').forEach(el=>{
+    // Viewer tetap boleh membuka riwayat transaksi, tetapi menu import/pemulihan data khusus admin.
+    if(el.dataset.page==='data')el.classList.toggle('readonly-hide',!admin);
+    else el.classList.remove('readonly-hide');
+  });
   if(!admin){
     document.querySelectorAll('#persediaan .smallbtn').forEach(el=>el.classList.add('readonly-hide'));
     document.getElementById('txForm').classList.add('readonly-hide');
+    // Form kapasitas hanya bisa dilihat; kontrol perubahan dinonaktifkan untuk viewer.
+    ['capacityInput','capacityMethod','locationName'].forEach(id=>{const el=document.getElementById(id);if(el)el.disabled=true;});
+  } else {
+    ['capacityInput','capacityMethod','locationName'].forEach(id=>{const el=document.getElementById(id);if(el)el.disabled=false;});
   }
 }
 async function startSession(user){
