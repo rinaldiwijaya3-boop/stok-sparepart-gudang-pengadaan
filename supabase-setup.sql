@@ -84,6 +84,8 @@ to authenticated
 using (public.is_admin())
 with check (public.is_admin());
 
+revoke all on public.profiles from anon;
+revoke all on public.app_state from anon;
 grant usage on schema public to authenticated;
 grant select, update on public.profiles to authenticated;
 grant select, insert, update on public.app_state to authenticated;
